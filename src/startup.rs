@@ -140,7 +140,7 @@ pub fn open_transfers_folder(transfer_root: &Path) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "전송 폴더를 열 수 없습니다 (코드: {})",
+            "Could not open transfers folder (code: {})",
             result.0 as isize
         ))
     }

@@ -382,11 +382,16 @@ unsafe fn show_context_menu(hwnd: HWND, state_cell: &RefCell<TrayState>) {
             hmenu,
             startup_flags,
             IDM_STARTUP,
-            w!("Windows 로그인 시 실행"),
+            w!("Run at Windows login"),
         );
-        let _ = AppendMenuW(hmenu, MF_STRING, IDM_OPEN_TRANSFERS, w!("전송 폴더 열기"));
+        let _ = AppendMenuW(
+            hmenu,
+            MF_STRING,
+            IDM_OPEN_TRANSFERS,
+            w!("Open transfers folder"),
+        );
         let _ = AppendMenuW(hmenu, MF_SEPARATOR, 0, PCWSTR::null());
-        let _ = AppendMenuW(hmenu, MF_STRING, IDM_EXIT, w!("종료"));
+        let _ = AppendMenuW(hmenu, MF_STRING, IDM_EXIT, w!("Exit"));
 
         state_cell.borrow_mut().active_menu = Some(hmenu);
         // Declared after `_menu_guard` so `active_menu` is cleared before `DestroyMenu` runs.
@@ -515,7 +520,7 @@ mod tests {
             let hmenu = CreatePopupMenu().expect("create popup menu");
             let _guard = MenuGuard(hmenu);
 
-            let initial = to_wide_null("갤럭시 클립보드 감시 중");
+            let initial = to_wide_null("Monitoring Galaxy clipboard");
             AppendMenuW(
                 hmenu,
                 MF_STRING | MF_GRAYED,
@@ -524,7 +529,7 @@ mod tests {
             )
             .expect("append status");
 
-            let updated_text = "클립보드에 이미지 복사됨 (1920 × 1080)";
+            let updated_text = "Image copied to clipboard (1920 × 1080)";
             assert!(update_menu_status_item(hmenu, updated_text));
 
             let mut buf = vec![0u16; 128];

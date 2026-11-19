@@ -77,4 +77,4 @@
    ```
    - `target\release\galaxy-clipboard-helper-rust.exe` 크기 확인 (`0.58` 기준 `336,384` 바이트 대비 회귀 여부 비교)
 4. 실기기/세션 수동 회귀 확인 (가능 시)
-   - 트레이 메뉴 표시, `Windows 로그인 시 실행` 레지스트리 토글, 갤럭시 이미지 복사 → `CF_DIB`/`PNG`/`B0CD2DD9` 등록 및 앱 붙여넣기 동작 확인
+   - 트레이 메뉴 표시, `Run at Windows login` 레지스트리 토글, 갤럭시 이미지 복사 → `CF_DIB`/`PNG`/`B0CD2DD9` 등록 및 앱 붙여넣기 동작 확인

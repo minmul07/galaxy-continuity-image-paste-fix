@@ -7,7 +7,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-0078D4?style=flat-square&logo=windows&logoColor=white)](#requirements)
 [![Rust](https://img.shields.io/badge/Rust-Edition%202024-DEA584?style=flat-square&logo=rust&logoColor=black)](#build-from-source)
 [![Runtime](https://img.shields.io/badge/Runtime-Win32%20%2B%20WIC%20(Zero%20Deps)-2EA44F?style=flat-square)](#key-features)
-[![Binary Size](https://img.shields.io/badge/Binary-~333%20KiB-6E40C9?style=flat-square)](#key-features)
+[![Binary Size](https://img.shields.io/badge/Binary-~332%20KiB-6E40C9?style=flat-square)](#key-features)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](./LICENSE)
 
 **English** · [한국어](./docs/README.ko.md)
@@ -20,9 +20,6 @@
 
 **Galaxy Clipboard Helper** is a lightweight, standalone Windows system tray utility written in Rust (Win32 + WIC). It monitors Samsung Continuity Service clipboard transfers in the background and converts Samsung's temporary placeholder files into real `PNG` and `CF_DIB` clipboard images — without keyboard hooks, fake `Ctrl+V` keystrokes, Explorer window automation, or patching Samsung binaries.
 
-> [!NOTE]
-> This is a native Rust rewrite of the C# `GalaxyClipboardHelper`, preserving the exact transfer flow and single-instance mutex while shrinking the standalone executable to **~333 KiB** with **zero `.NET` or external runtime dependencies**.
-
 ## Why This Exists
 
 When you copy an image on a Samsung Galaxy phone or tablet with **Clipboard sharing** (`Samsung Continuity Service`) enabled, Windows does not receive a standard `PNG` or bitmap immediately. Instead, Samsung places a **0-byte placeholder file** (`~ClipboardTransferring.tmp`) on the clipboard as a file drop (`CF_HDROP`) alongside a Samsung sync tag (`B0CD2DD9`).
@@ -34,7 +31,7 @@ Samsung Continuity Service only starts transferring the real image from your Gal
 | **Browsers & Web Apps** (Chrome, Edge, Notion, Figma, Discord, Slack) | Pastes a `.tmp` file path or fails to paste | Pastes a real **`PNG`** image (preserving transparency) |
 | **Image Editors & Legacy Win32 Apps** (Paint, editors, chat apps) | Rejects `.tmp` file drop or does nothing | Pastes a standard **`CF_DIB`** bitmap or **`PNG`** |
 | **Microsoft Office & Samsung Notes** | Direct Samsung insertion works | **Still works natively** — helper automatically defers while focused |
-| **Runtime & Background Impact** | — | Single **~333 KiB** `.exe`, event-driven (`WM_CLIPBOARDUPDATE`), zero idle polling |
+| **Runtime & Background Impact** | — | Single **~332 KiB** `.exe`, event-driven (`WM_CLIPBOARDUPDATE`), zero idle polling |
 
 ## Key Features
 
@@ -42,7 +39,7 @@ Samsung Continuity Service only starts transferring the real image from your Gal
 - **Full-Fidelity Dual Formats (`PNG` + `CF_DIB`)** — Decodes received bytes via Windows Imaging Component (WIC) by file signature rather than extension, publishing both a lossless `PNG` (preserving alpha, grayscale, indexed palettes, 16-bit channels, and DPI metadata) and a universal top-down 24-bit BGR `CF_DIB`.
 - **Anti-Loop Sync Protection** — Keeps Samsung's `B0CD2DD9` tag on the converted clipboard payload so Galaxy Connect will not sync the converted image back to your phone.
 - **Smart Foreground Deferral (UAC-Aware)** — Automatically pauses transfer initiation while `WINWORD`, `EXCEL`, `POWERPNT`, `APPLICATIONFRAMEHOST` (UWP apps), or `*SamsungNotes*` is in the foreground, resuming the moment you switch apps. Falls back to `ToolHelp32` process snapshots so elevated/UAC windows are identified without requiring admin privileges.
-- **Ultra-Lightweight Standalone Binary** — Built in Rust with only the official `windows` crate (`~333 KiB` stripped LTO release `.exe`). Links exclusively against 9 built-in Windows system DLLs — no `.NET`, Visual C++ Redistributable, or MinGW DLLs required.
+- **Ultra-Lightweight Standalone Binary** — Built in Rust with only the official `windows` crate (`~332 KiB` stripped LTO release `.exe`). Links exclusively against 9 built-in Windows system DLLs — no `.NET`, Visual C++ Redistributable, or MinGW DLLs required.
 - **Polished Native Win32 Integration** — Per-Monitor V2 DPI awareness, Common Controls v6 visual styles via `shell32.dll` manifest activation, automatic tray icon recovery after Explorer restarts (`TaskbarCreated`), and a live-updating status menu.
 - **Defensive by Design** — Re-verifies Windows clipboard sequence numbers before staging and atomically under the clipboard lock before writing; rejects directories and NTFS reparse points/symlinks; caps decoding at `64 MiB` and `40,000,000` pixels; cleans up completed staging files while preserving unreadable, oversized, or multi-item transfers for manual recovery.
 
@@ -67,27 +64,12 @@ flowchart TD
 
 ### Step-by-Step Lifecycle
 
-1. **Single-Instance Guard**: Acquires the `Local\GalaxyClipboardHelper` named mutex so only one instance (Rust or original C#) can run per Windows session.
+1. **Single-Instance Guard**: Acquires the `Local\GalaxyClipboardHelper` named mutex so only one instance can run per Windows session.
 2. **Placeholder Detection**: Listens to `WM_CLIPBOARDUPDATE` and verifies that `CF_HDROP` contains exactly one 0-byte file matching `%ProgramData%\Samsung\SamsungContinuityService\ClipBoard\~ClipboardTransferring.tmp` alongside Samsung's `B0CD2DD9` format.
 3. **Foreground Deferral**: Checks the active foreground window's executable name. If it is `WINWORD`, `EXCEL`, `POWERPNT`, `APPLICATIONFRAMEHOST`, contains `SamsungNotes`, or cannot be resolved, transfer initiation waits until focus moves elsewhere.
 4. **Transfer Trigger & Stability Wait**: Re-verifies the clipboard sequence number, creates `%LOCALAPPDATA%\GalaxyClipboardHelper\Transfers\<GUID>`, and copies the 0-byte placeholder into it to trigger Samsung's transfer. Watches Samsung's receiving marker (`~BCF97A05F26299AA.tmp`) and destination directory until one regular (non-directory, non-reparse-point) file remains unchanged in path, size, and modified timestamp for **600 ms** (up to a **30-second** timeout). If the user copies something else on the PC mid-transfer, the in-flight transfer is canceled immediately.
 5. **Background WIC Decoding**: Spawns a worker thread to open the file with `FILE_SHARE_READ` only (retrying automatically on `ERROR_SHARING_VIOLATION` / `ERROR_LOCK_VIOLATION`), validates size (`<= 64 MiB`) and dimensions (`<= 40,000,000` pixels), and decodes via WIC content sniffing rather than file extension.
 6. **Atomic Clipboard Publishing & Cleanup**: Notifies the UI thread (`WM_DECODE_DONE`), verifies the clipboard sequence number under `OpenClipboard`, and publishes `CF_DIB`, `PNG`, and `B0CD2DD9`. If the clipboard is momentarily busy, the decoded image stays cached in memory and retries on the next 150 ms tick without re-decoding. After writing succeeds, the temporary file and empty GUID folder are deleted.
-
-<details>
-<summary><strong>Technical Deep Dive: Pixel Format Preservation, DIB Encoding &amp; Binary Imports</strong></summary>
-
-- **Native PNG Pixel Format Preservation (`src/image.rs`)**:
-  - Indexed (`1/2/4/8bppIndexed` with palette copy), grayscale (`BlackWhite`, `2/4/8/16bppGray`), standard color (`24bppBGR`, `32bppBGRA`), and 16-bit-per-channel (`48bppRGB`, `64bppRGBA`) inputs are written directly in their native PNG pixel format along with source DPI resolution.
-  - Non-native WIC pixel formats are explicitly converted before encoding: `48bppBGR -> 48bppRGB`, `64bppBGRA / 64bppPBGRA / 64bppPRGBA -> 64bppRGBA`, `24bppRGB / 32bppBGR / 32bppRGB / 32bppCMYK / 16bppBGR555 / 16bppBGR565 -> 24bppBGR`, and all other formats -> `32bppBGRA`.
-- **Standard `CF_DIB` Encoding (`src/image.rs`)**:
-  - Writes a 40-byte `BITMAPINFOHEADER` with `biHeight = -height` (top-down), `biPlanes = 1`, `biBitCount = 24` (`BI_RGB` uncompressed BGR), and 4-byte aligned scanlines (`((width * 3) + 3) & !3`) using checked integer arithmetic.
-- **Verified Release Binary Imports (`target\release\galaxy-clipboard-helper-rust.exe`)**:
-  - `kernel32.dll`, `user32.dll`, `shell32.dll`, `advapi32.dll`, `ole32.dll`, `oleaut32.dll`, `ntdll.dll`, `msvcrt.dll`, `api-ms-win-core-synch-l1-2-0.dll` — all built into Windows.
-- **Release Optimization Profile (`Cargo.toml`)**:
-  - `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "abort"` -> `340,480` bytes (`332.5 KiB`).
-
-</details>
 
 ## Getting Started
 
@@ -108,7 +90,7 @@ cd galaxy-continuity-image-paste-fix
 # Run all 20 unit & state-machine tests
 cargo test
 
-# Build the standalone release executable (~333 KiB)
+# Build the standalone release executable (~332 KiB)
 cargo build --release
 ```
 
@@ -119,7 +101,7 @@ target\release\galaxy-clipboard-helper-rust.exe
 ```
 
 > [!TIP]
-> **Portable deployment**: You can copy `galaxy-clipboard-helper-rust.exe` to any folder (or another Windows 10/11 PC) and run it directly — no installer or runtime packages needed. Move the `.exe` to its permanent folder **before** enabling **Run at Windows login** (`Windows 로그인 시 실행`), since the registry entry points to the current executable path.
+> **Portable deployment**: You can copy `galaxy-clipboard-helper-rust.exe` to any folder (or another Windows 10/11 PC) and run it directly — no installer or runtime packages needed. Move the `.exe` to its permanent folder **before** enabling **Run at Windows login**, since the registry entry points to the current executable path.
 
 #### Toolchain Note (`windows = "0.58"`)
 
@@ -129,29 +111,26 @@ This project intentionally pins `windows = "0.58"` (which uses `windows-targets`
 
 Right-click the tray icon in the Windows notification area to open the context menu.
 
-> [!NOTE]
-> Context menu labels and status messages are currently localized in Korean.
-
-| Menu Item | English Meaning | Behavior |
-| :--- | :--- | :--- |
-| *(Disabled status line)* | Live status indicator | Shows current state or last pasted dimensions (updates live even while the menu stays open) |
-| **`Windows 로그인 시 실행`** | Run at Windows login | Toggles `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` value `GalaxyClipboardHelper` (off by default) |
-| **`전송 폴더 열기`** | Open transfers folder | Creates (if needed) and opens `%LOCALAPPDATA%\GalaxyClipboardHelper\Transfers` in File Explorer |
-| **`종료`** | Exit | Cleanly unregisters clipboard listener & tray icon and exits (preserves enabled login startup entry) |
+| Menu Item | Behavior |
+| :--- | :--- |
+| *(Disabled status line)* | Live status indicator showing the current state or last pasted dimensions (updates live even while the menu stays open) |
+| **`Run at Windows login`** | Toggles `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` value `GalaxyClipboardHelper` (off by default) |
+| **`Open transfers folder`** | Creates (if needed) and opens `%LOCALAPPDATA%\GalaxyClipboardHelper\Transfers` in File Explorer |
+| **`Exit`** | Cleanly unregisters clipboard listener & tray icon and exits (preserves enabled login startup entry) |
 
 <details>
 <summary><strong>Status Message Reference (all 8 states)</strong></summary>
 
 | Status Text (UI) | Meaning |
 | :--- | :--- |
-| `갤럭시 클립보드 감시 중` | Idle and listening for Samsung Continuity clipboard updates |
-| `다른 앱으로 전환하면 전송을 시작합니다` | Placeholder detected, paused because a deferred app (Office / UWP / Samsung Notes) or unidentified window is focused |
-| `갤럭시 이미지 전송 대기 중` | Placeholder staged; waiting for Samsung Continuity Service to deliver the file |
-| `클립보드에 이미지 복사됨 (W × H)` | Image decoded and registered as `CF_DIB` + `PNG` with pixel dimensions `W × H` |
-| `전송 시간 초과 · 갤럭시에서 다시 복사해 주세요` | Transfer did not complete within 30 seconds |
-| `여러 항목을 전송 폴더에 보관했습니다` | Multiple files, a directory, or a reparse point arrived; preserved in the Transfers folder |
-| `이미지로 읽을 수 없어 전송 파일을 보관했습니다` | File was unreadable, unsupported by installed WIC codecs, or exceeded 64 MiB / 40M pixels; preserved in the Transfers folder |
-| `전송 오류 · 갤럭시에서 다시 복사해 주세요` | Unexpected filesystem or Win32 I/O error during transfer |
+| `Monitoring Galaxy clipboard` | Idle and listening for Samsung Continuity clipboard updates |
+| `Switch to another app to start transfer` | Placeholder detected, paused because a deferred app (Office / UWP / Samsung Notes) or unidentified window is focused |
+| `Waiting for Galaxy image transfer` | Placeholder staged; waiting for Samsung Continuity Service to deliver the file |
+| `Image copied to clipboard (W × H)` | Image decoded and registered as `CF_DIB` + `PNG` with pixel dimensions `W × H` |
+| `Transfer timed out · Copy again on Galaxy` | Transfer did not complete within 30 seconds |
+| `Multiple items saved in transfers folder` | Multiple files, a directory, or a reparse point arrived; preserved in the Transfers folder |
+| `Unreadable file saved in transfers folder` | File was unreadable, unsupported by installed WIC codecs, or exceeded 64 MiB / 40M pixels; preserved in the Transfers folder |
+| `Transfer error · Copy again on Galaxy` | Unexpected filesystem or Win32 I/O error during transfer |
 
 </details>
 
@@ -190,38 +169,31 @@ The test suite includes **20 automated tests** covering BMP/PNG round-trip conve
 ## Troubleshooting & FAQ
 
 <details>
-<summary><strong>Why does the tray status stay on "다른 앱으로 전환하면 전송을 시작합니다" (Waiting for app switch)?</strong></summary>
+<summary><strong>Why does the tray status stay on "Switch to another app to start transfer"?</strong></summary>
 
 Transfer initiation intentionally pauses while Microsoft Word (`WINWORD`), Excel (`EXCEL`), PowerPoint (`POWERPNT`), UWP apps hosted by `ApplicationFrameHost`, or Samsung Notes (`*SamsungNotes*`) are focused so Samsung Continuity Service can paste directly into them. Simply click on your target app (e.g., Chrome, Paint, Slack) and the transfer starts immediately.
 
 </details>
 
 <details>
-<summary><strong>Can I run this at the same time as the original C# <code>GalaxyClipboardHelper</code>?</strong></summary>
-
-No. Both implementations intentionally share the `Local\GalaxyClipboardHelper` named mutex so two helpers never race over the same clipboard in a Windows session. Close the C# version before starting the Rust version.
-
-</details>
-
-<details>
 <summary><strong>Why did a HEIC, AVIF, or WebP image fail to convert?</strong></summary>
 
-Decoding uses Windows Imaging Component (WIC). Standard formats (PNG, JPEG, BMP, GIF, TIFF) work out of the box on Windows, while HEIC, AVIF, and WebP require the corresponding Windows codec extensions from the Microsoft Store. Failed files are never deleted — open **`전송 폴더 열기`** from the tray menu to access them directly.
+Decoding uses Windows Imaging Component (WIC). Standard formats (PNG, JPEG, BMP, GIF, TIFF) work out of the box on Windows, while HEIC, AVIF, and WebP require the corresponding Windows codec extensions from the Microsoft Store. Failed files are never deleted — open **`Open transfers folder`** from the tray menu to access them directly.
 
 </details>
 
 <details>
 <summary><strong>I moved the <code>.exe</code> to another folder and login autostart stopped working.</strong></summary>
 
-`Windows 로그인 시 실행` stores the exact path of the running executable in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Run the `.exe` from its new location and toggle `Windows 로그인 시 실행` off and back on to update the path.
+`Run at Windows login` stores the exact path of the running executable in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Run the `.exe` from its new location and toggle `Run at Windows login` off and back on to update the path.
 
 </details>
 
 <details>
 <summary><strong>How do I completely uninstall Galaxy Clipboard Helper?</strong></summary>
 
-1. Right-click the tray icon and uncheck **`Windows 로그인 시 실행`** (if checked).
-2. Click **`종료`** to exit the application.
+1. Right-click the tray icon and uncheck **`Run at Windows login`** (if checked).
+2. Click **`Exit`** to exit the application.
 3. Delete `galaxy-clipboard-helper-rust.exe`.
 4. *(Optional)* Delete `%LOCALAPPDATA%\GalaxyClipboardHelper` to remove any preserved transfer files.
 

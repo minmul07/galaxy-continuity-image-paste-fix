@@ -16,13 +16,13 @@ pub const RECEIVING: &str = "~BCF97A05F26299AA.tmp";
 pub const TRANSFER_TIMEOUT: Duration = Duration::from_secs(30);
 pub const STABLE_DURATION: Duration = Duration::from_millis(600);
 
-pub const STATUS_WATCHING: &str = "갤럭시 클립보드 감시 중";
-pub const STATUS_WAIT_APP_SWITCH: &str = "다른 앱으로 전환하면 전송을 시작합니다";
-pub const STATUS_WAITING_TRANSFER: &str = "갤럭시 이미지 전송 대기 중";
-pub const STATUS_TIMEOUT: &str = "전송 시간 초과 · 갤럭시에서 다시 복사해 주세요";
-pub const STATUS_MULTIPLE_ITEMS: &str = "여러 항목을 전송 폴더에 보관했습니다";
-pub const STATUS_UNREADABLE: &str = "이미지로 읽을 수 없어 전송 파일을 보관했습니다";
-pub const STATUS_ERROR: &str = "전송 오류 · 갤럭시에서 다시 복사해 주세요";
+pub const STATUS_WATCHING: &str = "Monitoring Galaxy clipboard";
+pub const STATUS_WAIT_APP_SWITCH: &str = "Switch to another app to start transfer";
+pub const STATUS_WAITING_TRANSFER: &str = "Waiting for Galaxy image transfer";
+pub const STATUS_TIMEOUT: &str = "Transfer timed out · Copy again on Galaxy";
+pub const STATUS_MULTIPLE_ITEMS: &str = "Multiple items saved in transfers folder";
+pub const STATUS_UNREADABLE: &str = "Unreadable file saved in transfers folder";
+pub const STATUS_ERROR: &str = "Transfer error · Copy again on Galaxy";
 
 const FILE_ATTRIBUTE_DIRECTORY: u32 = 0x10;
 const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
@@ -324,7 +324,7 @@ impl TransferController {
 
         match clipboard.write_image(snapshot.sequence, img)? {
             ClipboardWrite::Written => {
-                let message = format!("클립보드에 이미지 복사됨 ({} × {})", img.width, img.height);
+                let message = format!("Image copied to clipboard ({} × {})", img.width, img.height);
                 let folder = transfer.folder.clone();
                 self.end_transfer(snapshot.sequence, message);
                 remove_completed_image(&candidate.path, &folder);
@@ -497,7 +497,7 @@ mod tests {
         let keep_running =
             drive_decode_to_completion(&mut ctrl, &mock, t0 + Duration::from_millis(80));
         assert!(!keep_running);
-        assert_eq!(ctrl.status(), "클립보드에 이미지 복사됨 (3 × 2)");
+        assert_eq!(ctrl.status(), "Image copied to clipboard (3 × 2)");
 
         let written = mock.written.borrow();
         assert_eq!(written.len(), 1);
@@ -808,7 +808,7 @@ mod tests {
 
         // Next tick retries write_image directly using cached Ready image and succeeds!
         assert!(!ctrl.tick(&mock, t0 + Duration::from_millis(200)));
-        assert_eq!(ctrl.status(), "클립보드에 이미지 복사됨 (3 × 2)");
+        assert_eq!(ctrl.status(), "Image copied to clipboard (3 × 2)");
         assert_eq!(mock.written.borrow().len(), 1);
 
         let _ = fs::remove_dir_all(&root);
