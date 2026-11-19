@@ -67,11 +67,11 @@ impl NativeClipboard {
         unsafe {
             let png_format = RegisterClipboardFormatW(w!("PNG"));
             if png_format == 0 {
-                return Err(Error::from_win32());
+                return Err(Error::from_thread());
             }
             let samsung_tag_format = RegisterClipboardFormatW(w!("B0CD2DD9"));
             if samsung_tag_format == 0 {
-                return Err(Error::from_win32());
+                return Err(Error::from_thread());
             }
             AddClipboardFormatListener(hwnd)?;
             Ok(Self {
@@ -261,7 +261,7 @@ struct ClipboardLock;
 impl ClipboardLock {
     fn acquire(hwnd: HWND) -> Option<Self> {
         // SAFETY: `hwnd` is a valid window owned by the current thread.
-        unsafe { OpenClipboard(hwnd).ok().map(|()| Self) }
+        unsafe { OpenClipboard(Some(hwnd)).ok().map(|()| Self) }
     }
 }
 
@@ -288,7 +288,7 @@ impl ClipboardMemory {
             let mut mem = Self { hglobal };
             let ptr = GlobalLock(mem.hglobal);
             if ptr.is_null() {
-                return Err(Error::from_win32());
+                return Err(Error::from_thread());
             }
             if !bytes.is_empty() {
                 ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len());
@@ -303,7 +303,7 @@ impl ClipboardMemory {
     pub fn publish(mut self, format: u32) -> windows::core::Result<()> {
         // SAFETY: Clipboard is open by this thread and `self.hglobal` is unlocked valid memory.
         unsafe {
-            SetClipboardData(format, HANDLE(self.hglobal.0))?;
+            SetClipboardData(format, Some(HANDLE(self.hglobal.0)))?;
             self.hglobal = HGLOBAL::default(); // Windows owns the allocation after SetClipboardData succeeds.
             Ok(())
         }
@@ -315,7 +315,7 @@ impl Drop for ClipboardMemory {
         if !self.hglobal.is_invalid() {
             // SAFETY: Allocation was not transferred to Windows clipboard.
             unsafe {
-                let _ = GlobalFree(self.hglobal);
+                let _ = GlobalFree(Some(self.hglobal));
             }
         }
     }

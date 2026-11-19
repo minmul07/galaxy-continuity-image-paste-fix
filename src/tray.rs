@@ -59,7 +59,7 @@ impl TrayState {
         if !self.timer_running {
             // Guard with `timer_running` so rapid WM_CLIPBOARDUPDATE events do not reset the 150ms countdown.
             // SAFETY: `self.hwnd` is a valid window owned by this thread.
-            let id = unsafe { SetTimer(self.hwnd, TIMER_ID, POLL_INTERVAL_MS, None) };
+            let id = unsafe { SetTimer(Some(self.hwnd), TIMER_ID, POLL_INTERVAL_MS, None) };
             if id != 0 {
                 self.timer_running = true;
             }
@@ -70,7 +70,7 @@ impl TrayState {
         if self.timer_running {
             // SAFETY: `self.hwnd` is a valid window owned by this thread.
             unsafe {
-                let _ = KillTimer(self.hwnd, TIMER_ID);
+                let _ = KillTimer(Some(self.hwnd), TIMER_ID);
             }
             self.timer_running = false;
         }
@@ -144,7 +144,7 @@ pub fn run() -> windows::core::Result<()> {
 
     // SAFETY: `wc` points to a valid `WNDCLASSEXW` with static class name and `wnd_proc`.
     if unsafe { RegisterClassExW(&wc) } == 0 {
-        return Err(Error::from_win32());
+        return Err(Error::from_thread());
     }
 
     // Use a hidden top-level tool window (not HWND_MESSAGE) so TaskbarCreated and TrackPopupMenuEx work reliably.
@@ -161,7 +161,7 @@ pub fn run() -> windows::core::Result<()> {
             0,
             None,
             None,
-            hinstance,
+            Some(hinstance),
             None,
         )?
     };
@@ -194,7 +194,7 @@ pub fn run() -> windows::core::Result<()> {
         let target = HWND(raw_hwnd as *mut c_void);
         // SAFETY: Posting `WM_DECODE_DONE` to a potentially closed HWND is safe; Win32 ignores invalid handles.
         unsafe {
-            let _ = PostMessageW(target, WM_DECODE_DONE, WPARAM(0), LPARAM(0));
+            let _ = PostMessageW(Some(target), WM_DECODE_DONE, WPARAM(0), LPARAM(0));
         }
     });
 
@@ -219,7 +219,7 @@ pub fn run() -> windows::core::Result<()> {
     }
 
     if !add_tray_icon(hwnd, hicon) {
-        let err = Error::from_win32();
+        let err = Error::from_thread();
         // SAFETY: Detach pointer and destroy window before freeing `state_ptr`.
         unsafe {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
@@ -329,16 +329,16 @@ fn update_open_menu_status(hmenu: HMENU, status_text: &str) {
     unsafe {
         let current_tid = GetCurrentThreadId();
         let mut menu_windows = Vec::new();
-        let mut after = HWND::default();
+        let mut after = None;
         while let Ok(menu_hwnd) = FindWindowExW(None, after, w!("#32768"), None) {
             if GetWindowThreadProcessId(menu_hwnd, None) == current_tid {
                 menu_windows.push(menu_hwnd);
             }
-            after = menu_hwnd;
+            after = Some(menu_hwnd);
         }
         for menu_hwnd in menu_windows {
-            let _ = SendMessageW(menu_hwnd, MN_SIZEWINDOW, WPARAM(0), LPARAM(0));
-            let _ = InvalidateRect(menu_hwnd, None, true);
+            let _ = SendMessageW(menu_hwnd, MN_SIZEWINDOW, Some(WPARAM(0)), Some(LPARAM(0)));
+            let _ = InvalidateRect(Some(menu_hwnd), None, true);
             let _ = UpdateWindow(menu_hwnd);
         }
     }
@@ -408,7 +408,7 @@ unsafe fn show_context_menu(hwnd: HWND, state_cell: &RefCell<TrayState>) {
             hwnd,
             None,
         );
-        let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
+        let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
         selected.0 as usize
     };
 

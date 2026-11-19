@@ -39,7 +39,7 @@ Samsung Continuity Service only starts transferring the real image from your Gal
 - **Full-Fidelity Dual Formats (`PNG` + `CF_DIB`)** — Decodes received bytes via Windows Imaging Component (WIC) by file signature rather than extension, publishing both a lossless `PNG` (preserving alpha, grayscale, indexed palettes, 16-bit channels, and DPI metadata) and a universal top-down 24-bit BGR `CF_DIB`.
 - **Anti-Loop Sync Protection** — Keeps Samsung's `B0CD2DD9` tag on the converted clipboard payload so Galaxy Connect will not sync the converted image back to your phone.
 - **Smart Foreground Deferral (UAC-Aware)** — Automatically pauses transfer initiation while `WINWORD`, `EXCEL`, `POWERPNT`, `APPLICATIONFRAMEHOST` (UWP apps), or `*SamsungNotes*` is in the foreground, resuming the moment you switch apps. Falls back to `ToolHelp32` process snapshots so elevated/UAC windows are identified without requiring admin privileges.
-- **Ultra-Lightweight Standalone Binary** — Built in Rust with only the official `windows` crate (`~332 KiB` stripped LTO release `.exe`). Links exclusively against 9 built-in Windows system DLLs — no `.NET`, Visual C++ Redistributable, or MinGW DLLs required.
+- **Ultra-Lightweight Standalone Binary** — Built in Rust with only the official `windows` crate (`~332 KiB` stripped LTO release `.exe`). Links exclusively against 10 built-in Windows system DLLs — no `.NET`, Visual C++ Redistributable, or MinGW DLLs required.
 - **Polished Native Win32 Integration** — Per-Monitor V2 DPI awareness, Common Controls v6 visual styles via `shell32.dll` manifest activation, automatic tray icon recovery after Explorer restarts (`TaskbarCreated`), and a live-updating status menu.
 - **Defensive by Design** — Re-verifies Windows clipboard sequence numbers before staging and atomically under the clipboard lock before writing; rejects directories and NTFS reparse points/symlinks; caps decoding at `64 MiB` and `40,000,000` pixels; cleans up completed staging files while preserving unreadable, oversized, or multi-item transfers for manual recovery.
 
@@ -103,9 +103,15 @@ target\release\galaxy-clipboard-helper-rust.exe
 > [!TIP]
 > **Portable deployment**: You can copy `galaxy-clipboard-helper-rust.exe` to any folder (or another Windows 10/11 PC) and run it directly — no installer or runtime packages needed. Move the `.exe` to its permanent folder **before** enabling **Run at Windows login**, since the registry entry points to the current executable path.
 
-#### Toolchain Note (`windows = "0.58"`)
+#### Toolchain Note (`windows = "0.62"`)
 
-This project intentionally pins `windows = "0.58"` (which uses `windows-targets` static import libraries) so both `x86_64-pc-windows-msvc` and standalone `x86_64-pc-windows-gnu` toolchains build out of the box without needing external `dlltool.exe` / `as.exe`. See [docs/BACKLOG.md](./docs/BACKLOG.md) for the planned migration to `windows = "0.62"`.
+This project uses `windows = "0.62"` (`windows-link` / `raw-dylib`):
+
+- **`x86_64-pc-windows-msvc`** requires Visual Studio Build Tools.
+- **`x86_64-pc-windows-gnu`** requires MinGW-w64 `binutils` (`dlltool.exe` and `as.exe`, e.g., MSYS2 `mingw-w64-x86_64-binutils`) on `PATH` for `raw-dylib` import generation.
+- **`x86_64-pc-windows-gnullvm`** defaults to `x86_64-w64-mingw32-clang`. Install an LLVM-based C toolchain such as `llvm-mingw` with static `libunwind` and add its `bin` directory to `PATH`. For a pure Rust build with `x86_64-pc-windows-gnullvm` as both host and target, you can instead install the `rust-mingw` component and explicitly select `rust-lld` in PowerShell with `$env:CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER = 'rust-lld'`. Rust does not automatically fall back to `rust-lld`. See [Rust's gnullvm target guide](https://doc.rust-lang.org/rustc/platform-support/windows-gnullvm.html#building-rust-programs).
+
+See [docs/BACKLOG.md](./docs/BACKLOG.md) for the `windows` `0.58` → `0.62` migration record.
 
 ## System Tray Menu
 
@@ -140,10 +146,10 @@ The codebase is intentionally modular with zero third-party crates beyond `windo
 
 ```text
 galaxy-continuity-image-paste-fix/
-├── Cargo.toml           # Single dependency (`windows = "0.58"`) & size-optimized release profile
+├── Cargo.toml           # Single dependency (`windows = "0.62"`) & size-optimized release profile
 ├── docs/
 │   ├── README.ko.md     # Korean documentation
-│   └── BACKLOG.md       # `windows` 0.58 -> 0.62 migration checklist
+│   └── BACKLOG.md       # `windows` 0.58 -> 0.62 migration checklist (completed)
 └── src/
     ├── main.rs          # DPI awareness, ComCtl v6 visual styles, single-instance mutex, STA COM
     ├── tray.rs          # Hidden tool window, tray icon, TaskbarCreated recovery, live popup menu
@@ -201,7 +207,7 @@ Decoding uses Windows Imaging Component (WIC). Standard formats (PNG, JPEG, BMP,
 
 ## Roadmap
 
-- Migrate from `windows = "0.58"` (`windows-targets`) to `windows = "0.62"` (`windows-link` / `raw-dylib`) — see [docs/BACKLOG.md](./docs/BACKLOG.md) for the complete migration checklist and toolchain prerequisites.
+- [x] Migrate from `windows = "0.58"` (`windows-targets`) to `windows = "0.62"` (`windows-link` / `raw-dylib`) — see [docs/BACKLOG.md](./docs/BACKLOG.md) for the completed migration checklist and details.
 
 ## License
 

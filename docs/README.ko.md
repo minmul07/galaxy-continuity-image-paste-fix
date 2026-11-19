@@ -39,7 +39,7 @@
 - **고품질 듀얼 포맷 등록 (`PNG` + `CF_DIB`)** — 확장자가 아닌 실제 파일 시그니처를 Windows Imaging Component(WIC)로 판별해 디코딩합니다. 투명도(알파), 그레이스케일, 인덱스 팔레트, 16비트 색 깊이 및 DPI 해상도를 유지한 **`PNG`**와 호환성이 뛰어난 top-down 24비트 BGR **`CF_DIB`**를 함께 등록합니다.
 - **재동기화 루프 방지** — 변환된 클립보드 항목에도 삼성 태그(`B0CD2DD9`)를 유지해 Galaxy Connect가 이미지를 다시 폰으로 역전송하지 않도록 막습니다.
 - **스마트 포그라운드 앱 보류 (UAC 대응)** — `WINWORD`, `EXCEL`, `POWERPNT`, `APPLICATIONFRAMEHOST`(UWP 앱), `*SamsungNotes*`가 활성 창일 때는 전송을 자동 보류하고, 다른 앱으로 전환하는 즉시 전송을 시작합니다. 관리자 권한(UAC/PPL) 창도 `ToolHelp32` 스냅샷 폴백으로 안전하게 식별합니다.
-- **외부 의존성 없는 초경량 단일 실행 파일** — 공식 `windows` 크레이트 단 하나만 사용해 빌드되며(`~332 KiB` LTO/strip 릴리스 `.exe`), Windows 기본 내장 시스템 DLL 9개만 참조합니다. `.NET`, Visual C++ 재배포 패키지, MinGW DLL 설치 없이 바로 실행됩니다.
+- **외부 의존성 없는 초경량 단일 실행 파일** — 공식 `windows` 크레이트 단 하나만 사용해 빌드되며(`~332 KiB` LTO/strip 릴리스 `.exe`), Windows 기본 내장 시스템 DLL 10개만 참조합니다. `.NET`, Visual C++ 재배포 패키지, MinGW DLL 설치 없이 바로 실행됩니다.
 - **네이티브 Win32 UX 완성도** — Per-Monitor V2 DPI 대응, `shell32.dll` 내장 매니페스트를 통한 Common Controls v6 시각 스타일 활성화, `explorer.exe` 재시작 시 트레이 아이콘 자동 복구(`TaskbarCreated`), 팝업 메뉴가 열린 상태에서의 실시간 상태 텍스트 갱신을 지원합니다.
 - **안전 중심 설계** — 자리표시자 복제 전과 클립보드 쓰기 직전(`OpenClipboard` 잠금 내부)에 클립보드 시퀀스 번호를 재검증하고, 디렉터리·NTFS 재분석 지점(심볼릭 링크)을 차단합니다. 파일 크기(`64 MiB`) 및 픽셀 수(`40,000,000`픽셀) 상한을 두며, 완료된 임시 파일은 자동 정리하고 실패·초과·다중 항목은 손실 없이 전송 폴더에 보관합니다.
 
@@ -103,9 +103,15 @@ target\release\galaxy-clipboard-helper-rust.exe
 > [!TIP]
 > **포터블 배포**: `galaxy-clipboard-helper-rust.exe` 파일 하나만 원하는 폴더나 다른 Windows 10/11 PC로 복사해 바로 실행할 수 있습니다. **`Run at Windows login`**은 현재 실행 파일의 경로를 레지스트리에 기록하므로, `.exe`를 최종 보관할 폴더로 옮긴 뒤 자동 실행을 켜는 것을 권장합니다.
 
-#### 툴체인 안내 (`windows = "0.58"`)
+#### 툴체인 안내 (`windows = "0.62"`)
 
-`x86_64-pc-windows-msvc`뿐만 아니라 단독 설치된 `x86_64-pc-windows-gnu` 툴체인에서도 외부 `dlltool.exe` / `as.exe` 없이 바로 빌드되도록 `windows = "0.58"`(`windows-targets` 정적 임포트 라이브러리 사용)을 기준으로 구성했습니다. `windows = "0.62"` 마이그레이션 계획은 [docs/BACKLOG.md](./BACKLOG.md)를 참고하세요.
+이 프로젝트는 `windows = "0.62"`(`windows-link` / `raw-dylib`)를 사용합니다.
+
+- **`x86_64-pc-windows-msvc`** 타겟은 Visual Studio Build Tools가 필요합니다.
+- **`x86_64-pc-windows-gnu`** 타겟은 `raw-dylib` 임포트 생성을 위해 MinGW-w64 `binutils`(`dlltool.exe` 및 `as.exe`, 예: MSYS2 `mingw-w64-x86_64-binutils`)가 `PATH`에 있어야 합니다.
+- **`x86_64-pc-windows-gnullvm`** 타겟의 기본 링커 드라이버는 `x86_64-w64-mingw32-clang`입니다. 정적 `libunwind`를 제공하는 `llvm-mingw` 같은 LLVM 기반 C 툴체인을 설치하고 해당 툴체인의 `bin` 폴더를 `PATH`에 추가하세요. 호스트와 타겟이 모두 `x86_64-pc-windows-gnullvm`인 환경에서 순수 Rust 코드를 빌드할 때는 `rust-mingw` 컴포넌트를 설치하고 PowerShell에서 `$env:CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER = 'rust-lld'`를 실행해 `rust-lld`를 명시적으로 선택할 수 있습니다. Rust는 `rust-lld`로 자동 전환하지 않습니다. 자세한 내용은 [Rust의 gnullvm 타겟 가이드](https://doc.rust-lang.org/rustc/platform-support/windows-gnullvm.html#building-rust-programs)를 참고하세요.
+
+`windows` `0.58` → `0.62` 마이그레이션 기록은 [docs/BACKLOG.md](./BACKLOG.md)를 참고하세요.
 
 ## 시스템 트레이 메뉴
 
@@ -143,10 +149,10 @@ Windows 작업 표시줄 알림 영역의 트레이 아이콘을 우클릭하면
 
 ```text
 galaxy-continuity-image-paste-fix/
-├── Cargo.toml           # 단일 의존성(`windows = "0.58"`) 및 크기 최적화 릴리스 프로파일
+├── Cargo.toml           # 단일 의존성(`windows = "0.62"`) 및 크기 최적화 릴리스 프로파일
 ├── docs/
 │   ├── README.ko.md     # 한국어 문서
-│   └── BACKLOG.md       # `windows` 0.58 -> 0.62 마이그레이션 체크리스트
+│   └── BACKLOG.md       # `windows` 0.58 -> 0.62 마이그레이션 기록
 └── src/
     ├── main.rs          # DPI 인식, ComCtl v6 시각 스타일, 단일 실행 뮤텍스, STA COM 초기화
     ├── tray.rs          # 숨김 도구 창, 트레이 아이콘, TaskbarCreated 복구, 실시간 팝업 메뉴
@@ -204,7 +210,7 @@ Microsoft Word(`WINWORD`), Excel(`EXCEL`), PowerPoint(`POWERPNT`), UWP 호스트
 
 ## 로드맵
 
-- `windows = "0.58"`(`windows-targets`)에서 `windows = "0.62"`(`windows-link` / `raw-dylib`)로 마이그레이션 — 자세한 선행 조건과 코드 변경 체크리스트는 [docs/BACKLOG.md](./BACKLOG.md)를 참고하세요.
+- [x] `windows = "0.58"`(`windows-targets`)에서 `windows = "0.62"`(`windows-link` / `raw-dylib`)로 마이그레이션 — 완료된 체크리스트와 세부 사항은 [docs/BACKLOG.md](./BACKLOG.md)를 참고하세요.
 
 ## 라이선스
 

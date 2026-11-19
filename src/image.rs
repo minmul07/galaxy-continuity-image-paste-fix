@@ -269,7 +269,7 @@ unsafe fn encode_png(
         let hglobal = GetHGlobalFromStream(&out_stream)?;
         let ptr = GlobalLock(hglobal);
         if ptr.is_null() {
-            return Err(Error::from_win32());
+            return Err(Error::from_thread());
         }
         let result = if GlobalSize(hglobal) >= len {
             Ok(std::slice::from_raw_parts(ptr as *const u8, len).to_vec())

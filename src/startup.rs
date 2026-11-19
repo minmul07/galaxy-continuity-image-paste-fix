@@ -39,7 +39,7 @@ pub fn starts_on_login() -> bool {
         if RegOpenKeyExW(
             HKEY_CURRENT_USER,
             PCWSTR(key_wide.as_ptr()),
-            0,
+            None,
             KEY_QUERY_VALUE,
             &mut hkey,
         ) != ERROR_SUCCESS
@@ -72,7 +72,7 @@ pub fn toggle_startup() -> windows::core::Result<bool> {
         let status = RegCreateKeyExW(
             HKEY_CURRENT_USER,
             PCWSTR(key_wide.as_ptr()),
-            0,
+            None,
             None,
             REG_OPTION_NON_VOLATILE,
             KEY_SET_VALUE | KEY_QUERY_VALUE,
@@ -112,7 +112,7 @@ pub fn toggle_startup() -> windows::core::Result<bool> {
                 value_wide_data.len() * std::mem::size_of::<u16>(),
             );
             let set_status =
-                RegSetValueExW(hkey, PCWSTR(value_wide.as_ptr()), 0, REG_SZ, Some(bytes));
+                RegSetValueExW(hkey, PCWSTR(value_wide.as_ptr()), None, REG_SZ, Some(bytes));
             if set_status != ERROR_SUCCESS {
                 return Err(Error::from(HRESULT::from_win32(set_status.0)));
             }

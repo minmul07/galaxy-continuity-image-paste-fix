@@ -128,7 +128,7 @@ pub fn show_message_box(hwnd: Option<HWND>, text: &str, title: &str, flags: MESS
     // SAFETY: Both pointers are valid null-terminated UTF-16 strings for the call duration.
     unsafe {
         MessageBoxW(
-            hwnd.unwrap_or_default(),
+            hwnd,
             PCWSTR(wide_text.as_ptr()),
             PCWSTR(wide_title.as_ptr()),
             flags,
@@ -189,7 +189,7 @@ impl VisualStylesGuard {
             };
             let handle = CreateActCtxW(&actctx).ok()?;
             let mut cookie = 0usize;
-            if ActivateActCtx(handle, &mut cookie).is_err() {
+            if ActivateActCtx(Some(handle), &mut cookie).is_err() {
                 ReleaseActCtx(handle);
                 return None;
             }
